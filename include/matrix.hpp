@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <cmath>
 #include <iomanip>
+#include <utility>
 
 namespace MatrixOperation {
 
@@ -14,81 +15,70 @@ namespace MatrixOperation {
     concept Arithmetic = std::is_arithmetic_v<T>;
 
     template<Arithmetic T>
-    class Matrix_t {
+    class BaseMatrix {
 
     private:
         static constexpr size_t max_size_of_matrix = 1e10;
 
     protected:
-        size_t rows = 0;
-        size_t cols = 0;
+        size_t rows;
+        size_t cols;
         T* matrix;
 
-        Matrix_t(size_t init_rows, size_t init_cols) {
+        BaseMatrix(size_t rows, size_t cols) : rows(rows), cols(cols) {
             
-            if (init_rows > max_size_of_matrix) {
+            if (rows > max_size_of_matrix) {
                 throw std::invalid_argument("Invalid number of rows");
             }
 
-            if (init_cols > max_size_of_matrix) {
+            if (cols > max_size_of_matrix) {
                 throw std::invalid_argument("Invalid number of columns");
             }
-
-            rows = init_rows;
-            cols = init_cols;
 
             matrix = new T[rows * cols]();
         }
 
-        Matrix_t(const Matrix_t<T>& other) : rows(other.rows), cols(other.cols), matrix(new T[other.cols * other.rows]) {
+        BaseMatrix(const BaseMatrix<T>& other) : rows(other.rows), cols(other.cols), matrix(new T[other.cols * other.rows]) {
 
             std::copy(other.matrix, other.matrix + rows * cols, matrix);
         }
 
-        Matrix_t(Matrix_t<T>&& other) noexcept : rows(other.rows), cols(other.cols), matrix(other.matrix) {
+        BaseMatrix(BaseMatrix<T>&& other) noexcept : 
+            rows  (std::exchange(other.rows, 0)), 
+            cols  (std::exchange(other.cols, 0)), 
+            matrix(std::exchange(other.matrix, nullptr)) {}
 
-            other.matrix = nullptr;
-            other.rows = 0;
-            other.cols = 0;
-        }
+        BaseMatrix& operator=(const BaseMatrix<T>& other) {
 
-        Matrix_t& operator=(const Matrix_t<T>& other) {
-
-            if (this != &other) {
-                delete[] matrix;
-
-                rows = other.rows;
-                cols = other.cols;
-                matrix = new T[rows * cols];
-                std::copy(other.matrix, other.matrix + rows * cols, matrix);
-            }
+            BaseMatrix<T> tmp_matrix(other);
+            std::swap(rows,   tmp_matrix.rows);
+            std::swap(cols,   tmp_matrix.cols);
+            std::swap(matrix, tmp_matrix.matrix);
 
             return *this;
         }
 
-        Matrix_t& operator=(Matrix_t<T>&& other) noexcept {
+        BaseMatrix& operator=(BaseMatrix<T>&& other) noexcept {
 
-            if (this != &other) {
-                std::swap(rows, other.rows);
-                std::swap(cols, other.cols);
-                std::swap(matrix, other.matrix);
-            }
+            std::swap(rows, other.rows);
+            std::swap(cols, other.cols);
+            std::swap(matrix, other.matrix);
 
             return *this;
         }
 
-        ~Matrix_t() {
+        ~BaseMatrix() {
 
             delete[] matrix;
         }
     };
 
     template<Arithmetic T>
-    class Matrix final : private Matrix_t<T> {
+    class Matrix final : private BaseMatrix<T> {
 
-        using Matrix_t<T>::rows;
-        using Matrix_t<T>::cols;
-        using Matrix_t<T>::matrix;
+        using BaseMatrix<T>::rows;
+        using BaseMatrix<T>::cols;
+        using BaseMatrix<T>::matrix;
 
          struct ProxyRow final {
 
@@ -126,9 +116,9 @@ namespace MatrixOperation {
         }
         
     public:
-        Matrix(size_t init_rows, size_t init_cols) : Matrix_t<T>(init_rows, init_cols) {};
+        Matrix(size_t init_rows, size_t init_cols) : BaseMatrix<T>(init_rows, init_cols) {};
 
-        Matrix(size_t init_rows, size_t init_cols, const T& value) : Matrix_t<T>(init_rows, init_cols) {
+        Matrix(size_t init_rows, size_t init_cols, const T& value) : BaseMatrix<T>(init_rows, init_cols) {
 
             const size_t& size_of_matrix = init_cols * init_rows;
 
@@ -138,7 +128,7 @@ namespace MatrixOperation {
         }
 
         template<typename It>
-        Matrix(size_t init_rows, size_t init_cols, It start, It fin) : Matrix_t<T>(init_rows, init_cols) {
+        Matrix(size_t init_rows, size_t init_cols, It start, It fin) : BaseMatrix<T>(init_rows, init_cols) {
 
             size_t cur_ind = 0;
             const size_t& size_of_matrix = init_rows * init_cols;
@@ -167,7 +157,7 @@ namespace MatrixOperation {
         }
 
         template <Arithmetic T2>
-        Matrix(const Matrix<T2>& other) : Matrix_t<T>(other.GetNumberRows(), other.GetNumberCols()) {
+        Matrix(const Matrix<T2>& other) : BaseMatrix<T>(other.GetNumberRows(), other.GetNumberCols()) {
 
             for(size_t cur_row = 0; cur_row < rows; cur_row++) {
                 for (size_t cur_col = 0; cur_col < cols; cur_col++) {
