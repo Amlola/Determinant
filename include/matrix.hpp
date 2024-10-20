@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <iostream>
 #include <ostream>
@@ -8,6 +9,11 @@
 #include <cmath>
 #include <iomanip>
 #include <utility>
+
+inline bool CompareDouble(double first_number, double second_number) {
+
+    return std::fabs(first_number - second_number) < std::numeric_limits<double>::epsilon();
+}
 
 namespace MatrixOperation {
 
@@ -88,50 +94,39 @@ namespace MatrixOperation {
                 return row[n];
             }
 
-            T operator[](size_t n) const {
+            const T& operator[](size_t n) const {
                 return row[n];
             }
         };
-
-        bool CompareDouble(double first_number, double second_number) const {
-
-            static constexpr double EPS = 1e-9;
-
-            return std::fabs(first_number - second_number) < EPS;
-        }
 
         const T& GetElement(size_t cur_row, size_t cur_col) const {
 
             return matrix[cur_row * cols + cur_col];
         }
 
-        void SetElement(size_t cur_row, size_t cur_col, T value) {
+        void SetElement(size_t cur_row, size_t cur_col, const T& value) {
 
             matrix[cur_row * cols + cur_col] = value;
         }
 
-        void SetElement(size_t ind, T value) {
+        void SetElement(size_t ind, const T& value) {
 
             matrix[ind] = value;
         }
         
     public:
-        Matrix(size_t init_rows, size_t init_cols) : BaseMatrix<T>(init_rows, init_cols) {};
+        Matrix(size_t rows, size_t cols) : BaseMatrix<T>(rows, cols) {};
 
-        Matrix(size_t init_rows, size_t init_cols, const T& value) : BaseMatrix<T>(init_rows, init_cols) {
+        Matrix(size_t rows, size_t cols, const T& value) : BaseMatrix<T>(rows, cols) {
 
-            const size_t& size_of_matrix = init_cols * init_rows;
-
-            for (size_t cur_elem_ind = 0; cur_elem_ind < size_of_matrix; cur_elem_ind++) {
-                SetElement(cur_elem_ind, value);
-            }
+            std::fill(matrix, matrix + cols * rows, value);
         }
 
         template<typename It>
-        Matrix(size_t init_rows, size_t init_cols, It start, It fin) : BaseMatrix<T>(init_rows, init_cols) {
+        Matrix(size_t rows, size_t cols, It start, It fin) : BaseMatrix<T>(rows, cols) {
 
             size_t cur_ind = 0;
-            const size_t& size_of_matrix = init_rows * init_cols;
+            const size_t& size_of_matrix = rows * cols;
             It& it = start;
 
             while (cur_ind < size_of_matrix && it < fin) {
@@ -141,15 +136,15 @@ namespace MatrixOperation {
             }
         }
 
-        static Matrix<T>* IdentityMatrix(size_t init_rows, size_t init_cols) {
+        static Matrix<T>* IdentityMatrix(size_t rows, size_t cols) {
 
-            if (init_cols != init_rows) {
+            if (cols != rows) {
                 throw std::invalid_argument("The parameters must correspond to a square matrix");
             }
 
-            Matrix<T>* identity_matrix = new Matrix<T>(init_rows, init_cols, 0);
+            Matrix<T>* identity_matrix = new Matrix(rows, cols);
 
-            for (size_t cur_row = 0; cur_row < init_rows; cur_row++) {
+            for (size_t cur_row = 0; cur_row < rows; cur_row++) {
                 identity_matrix->SetElement(cur_row, cur_row, 1);
             }
 
@@ -195,6 +190,21 @@ namespace MatrixOperation {
                     transpose_matrix.SetElement(cur_col, cur_row, GetElement(cur_row, cur_col));
                 }
             }
+
+            // size_t cur_row = 0;
+            // size_t cur_col = 0;
+
+            // std::generate(transpose_matrix.matrix, transpose_matrix.matrix + rows * cols, [&]() {
+
+            //     const T& element = GetElement(cur_row, cur_col);
+            //     cur_row++;
+            //     if (cur_row == rows) {
+            //         cur_row = 0;
+            //         cur_col++;
+            //     }
+
+            //     return element;
+            // });
 
             *this = std::move(transpose_matrix);
 
@@ -277,7 +287,7 @@ namespace MatrixOperation {
                 throw std::invalid_argument("The parameters must correspond to a square matrix");
             }
 
-            unsigned int num_swaps = 0;   
+            size_t num_swaps = 0;   
 
             Matrix<double> tmp_matrix(*this);
 
